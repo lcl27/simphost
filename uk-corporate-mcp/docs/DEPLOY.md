@@ -3,7 +3,25 @@
 Target: Cloudflare Workers free tier. Cost to stand up is the domain (optional)
 and nothing else; the Companies House API key is free.
 
-## The short version
+## The shortest version — no local toolchain at all
+
+Add these repository secrets under **Settings → Secrets and variables → Actions**,
+then run the `uk-corporate-mcp` workflow from the Actions tab:
+
+| Secret | Where it comes from |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → "Edit Cloudflare Workers" template, plus **Workers KV Storage: Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | the hex id in your Workers dashboard URL |
+| `CH_API_KEY` | Companies House developer portal (below) |
+| `ADMIN_TOKEN` | optional; any long random string, guards `/admin/usage` |
+| `VERIFY_COMPANIES` | optional; comma-separated company numbers for the live check |
+
+The workflow runs the tests, creates or reuses the KV namespace, pushes the
+secrets to the worker, deploys with payments off, runs the live verification and
+prints the URLs in the run summary. It refuses to deploy if the secrets are
+absent, so nothing happens by accident.
+
+## The local version
 
 ```bash
 npm install
@@ -78,8 +96,13 @@ round-tripped. To move to mainnet, change **both** together:
 
 ```jsonc
 "X402_NETWORK": "eip155:8453",
-"X402_ASSET": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"  // USDC on Base
+"X402_ASSET": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"  // native USDC on Base
 ```
+
+That address is Circle's natively-issued USDC on Base mainnet, confirmed against
+BaseScan and Circle's own announcement. Check it again yourself before it holds
+real money — a wrong asset address produces a payment requirement no client can
+satisfy, and there are lookalike tokens.
 
 Changing one without the other will advertise a requirement no client can
 satisfy — the asset address is network-specific.

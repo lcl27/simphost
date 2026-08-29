@@ -22,10 +22,20 @@ it lose nothing.
 
 Each of these needs an account and a human; none of it can be done from here.
 
-1. **MCP registry.** `server.json` in the repository root is prepared for
-   submission — check the `$schema` URL is current at the time you submit, and
-   set the deployed URL. The registry is the single highest-value listing,
-   because it is what MCP clients enumerate.
+1. **MCP registry.** `server.json` is prepared and validated against the live
+   2025-12-11 schema. The registry is the highest-value listing, because it is
+   what MCP clients enumerate.
+
+   Two constraints worth knowing before you edit it: `description` is capped at
+   **100 characters**, and the server name must sit in the namespace your
+   GitHub identity grants — `io.github.lcl27/*`. `test/registry-manifest.test.ts`
+   holds both, so a rewrite fails locally rather than at submission.
+
+   ```bash
+   # set remotes[0].url to the deployed host first
+   mcp-publisher login github     # browser OAuth; proves the io.github.lcl27 namespace
+   mcp-publisher publish
+   ```
 2. **x402 Bazaar / indexes.** Point them at `/.well-known/x402`. The document is
    already in the shape section 8 of the x402 v2 specification describes, with
    `resource`, `type`, `accepts`, `lastUpdated` and `metadata` per item.

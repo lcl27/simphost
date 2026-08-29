@@ -1,0 +1,164 @@
+name: uk-corporate-mcp
+
+# Tests run on every push. Deployment runs only when the two secrets below are
+# present, so forks and unconfigured checkouts do the safe half and stop.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN  - "Edit Cloudflare Workers" template, plus Workers KV
+#                           Storage: Edit on the same account
+#   CLOUDFLARE_ACCOUNT_ID - from the Workers dashboard URL
+#   CH_API_KEY            - Companies House REST key
+# Optional:
+#   ADMIN_TOKEN           - guards /admin/usage; generated if absent
+#   VERIFY_COMPANIES      - comma-separated company numbers for the live check
+
+on:
+  push:
+    paths: ["uk-corporate-mcp/**", ".github/workflows/uk-corporate-mcp.yml"]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy after the tests pass"
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    working-directory: uk-corporate-mcp
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: uk-corporate-mcp/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Check the worker bundles
+        run: npx wrangler deploy --dry-run --outdir /tmp/bundle
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    # Never deploys by accident: a manual run that unticked the box, or a push
+    # to a repository without the secrets configured, stops here.
+    if: github.event_name != 'workflow_dispatch' || inputs.deploy
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: uk-corporate-mcp/package-lock.json
+      - run: npm ci
+
+      - name: Confirm the deployment is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CH_API_KEY: ${{ secrets.CH_API_KEY }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CH_API_KEY" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN or CH_API_KEY is not set; skipping deployment."
+            echo "configured=false" >> "$GITHUB_ENV"
+          else
+            echo "configured=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Resolve the usage ledger namespace
+        if: env.configured == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          # Reuse the namespace if it already exists; creating blindly on every
+          # run would leave a trail of orphaned namespaces.
+          LIST=$(npx wrangler kv namespace list 2>/dev/null || echo '[]')
+          KV_ID=$(printf '%s' "$LIST" | node -e '
+            let raw = "";
+            process.stdin.on("data", (d) => (raw += d));
+            process.stdin.on("end", () => {
+              try {
+                const found = JSON.parse(raw).find((n) => /METER/i.test(n.title ?? ""));
+                process.stdout.write(found ? found.id : "");
+              } catch { process.stdout.write(""); }
+            });
+          ')
+          if [ -z "$KV_ID" ]; then
+            echo "Creating the METER namespace..."
+            OUT=$(npx wrangler kv namespace create METER 2>&1)
+            KV_ID=$(printf '%s' "$OUT" | grep -oE '[0-9a-f]{32}' | head -1)
+          fi
+          if [ -z "$KV_ID" ]; then
+            echo "::error::Could not resolve or create the METER KV namespace."
+            exit 1
+          fi
+          echo "::add-mask::$KV_ID"
+          sed -i "s/REPLACE_WITH_KV_NAMESPACE_ID/$KV_ID/" wrangler.jsonc
+          echo "Usage ledger bound."
+
+      - name: Push secrets to the worker
+        if: env.configured == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CH_API_KEY: ${{ secrets.CH_API_KEY }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          FACILITATOR_TOKEN: ${{ secrets.X402_FACILITATOR_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$CH_API_KEY" | npx wrangler secret put CH_API_KEY
+          if [ -n "${ADMIN_TOKEN:-}" ]; then
+            printf '%s' "$ADMIN_TOKEN" | npx wrangler secret put ADMIN_TOKEN
+          fi
+          if [ -n "${FACILITATOR_TOKEN:-}" ]; then
+            printf '%s' "$FACILITATOR_TOKEN" | npx wrangler secret put X402_FACILITATOR_TOKEN
+          fi
+
+      - name: Deploy
+        if: env.configured == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          OUT=$(npx wrangler deploy 2>&1)
+          printf '%s\n' "$OUT"
+          URL=$(printf '%s' "$OUT" | grep -oE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)
+          if [ -z "$URL" ]; then
+            echo "::error::Deployed, but could not read the URL from wrangler's output."
+            exit 1
+          fi
+          echo "WORKER_URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Verify against live Companies House data
+        if: env.configured == 'true'
+        env:
+          VERIFY_COMPANIES: ${{ secrets.VERIFY_COMPANIES }}
+        run: |
+          set -euo pipefail
+          ARGS="--url $WORKER_URL"
+          if [ -n "${VERIFY_COMPANIES:-}" ]; then ARGS="$ARGS --companies $VERIFY_COMPANIES"; fi
+          # shellcheck disable=SC2086
+          node scripts/verify-live.mjs $ARGS
+
+      - name: Summary
+        if: env.configured == 'true'
+        run: |
+          {
+            echo "### Deployed"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Service card | $WORKER_URL/ |"
+            echo "| MCP endpoint | $WORKER_URL/mcp |"
+            echo "| Discovery | $WORKER_URL/.well-known/x402 |"
+            echo ""
+            echo "Payments are off until \`X402_PAY_TO\` is set in \`wrangler.jsonc\`."
+          } >> "$GITHUB_STEP_SUMMARY"
