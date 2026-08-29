@@ -13,9 +13,9 @@
     "usage": "node scripts/usage-report.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250906.0",
+    "@cloudflare/workers-types": "^5.20260829.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.9",
-    "wrangler": "^3.90.0"
+    "wrangler": "^4.127.1"
   }
 }
