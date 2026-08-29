@@ -106,11 +106,35 @@ server's own advertised requirements by scheme and network, checks that asset,
 object. A client cannot name its own price, redirect settlement, or substitute
 the asset. This is covered by tests in `test/x402.test.ts`.
 
+## Getting it live
+
+```bash
+npm install
+npm run setup     # KV, secrets, deploy, then verify against live data
+```
+
+`scripts/setup.sh` does the mechanical half of first deployment and is safe to
+re-run. It cannot create your Cloudflare or Companies House accounts, and it
+will not stand up a wallet — it prints what remains yours to do and stops.
+
+Then, before enabling payments:
+
+```bash
+npm run verify -- --url https://<your-worker>.workers.dev
+```
+
+This is the check that could not be run when the code was written. It calls both
+tools against real company numbers and reports whether the parsers coped:
+filing codes that fell through to `other`, nature-of-control codes it could not
+decompose, and any field in `identity_verification_details` it does not read.
+Non-zero exit on failure, so it can sit in a quarterly cron — which is exactly
+the upstream-drift task that otherwise needs remembering.
+
 ## Development
 
 ```bash
 npm install
-npm test          # 127 tests, no network
+npm test          # 138 tests, no network
 npm run typecheck
 npm run dev       # wrangler dev
 ```
@@ -133,10 +157,10 @@ responses; the values are invented.
 
 - Verified against the published Companies House API schema and hermetic
   fixtures, **not** against the live API — the build environment could not reach
-  `api.company-information.service.gov.uk`. The first deploy should run the
-  `curl` checks in `docs/DEPLOY.md` against a real company before payments are
-  enabled. The PSC identity-verification fields in particular have changed shape
-  more than once since the ECCTA provisions commenced; the parser is deliberately
+  `api.company-information.service.gov.uk`. Run `npm run verify` against the
+  first deployment before enabling payments; it exists precisely to close this
+  gap. The PSC identity-verification fields in particular have changed shape more
+  than once since the ECCTA provisions commenced; the parser is deliberately
   tolerant and degrades to `not_reported`, but it has not seen live data.
 - `fetch_all` pages to 500 filings. Beyond that the chronology is flagged
   `derived_from_complete_history: false` rather than silently truncated.
@@ -144,6 +168,8 @@ responses; the values are invented.
   Ledger writes fail open.
 - Quarterly schema maintenance is the standing human task: Companies House
   changes field shapes, and upstream drift is what will break this first.
+  `npm run verify` is the instrument for it — it names the codes and fields that
+  have drifted rather than just failing.
 
 ## Licence
 

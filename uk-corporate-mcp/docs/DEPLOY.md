@@ -3,6 +3,21 @@
 Target: Cloudflare Workers free tier. Cost to stand up is the domain (optional)
 and nothing else; the Companies House API key is free.
 
+## The short version
+
+```bash
+npm install
+npx wrangler login          # or export CLOUDFLARE_API_TOKEN
+npm run setup
+```
+
+`scripts/setup.sh` creates the KV namespace, sets the secrets, deploys with
+payments off, pins `PUBLIC_BASE_URL`, and runs the live verification. It is safe
+to re-run and each step checks whether it has already been done. It stops short
+of the wallet, deliberately.
+
+The rest of this document is what that script does, and the parts it cannot.
+
 ## 1. Companies House API key
 
 Register at <https://developer.company-information.service.gov.uk/>, create an
@@ -102,7 +117,35 @@ curl -X POST https://<your-worker>.workers.dev/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq '.result.tools[].name'
 ```
 
-## 7. Watch it
+## 7. Verify against live data
+
+Do this before enabling payments. Everything in this repository was written
+against the published Companies House schema and hermetic fixtures — the build
+environment's egress proxy blocked `api.company-information.service.gov.uk`, so
+no parser here has seen a real response.
+
+```bash
+npm run verify -- --url https://<your-worker>.workers.dev
+npm run verify -- --url https://<your-worker>.workers.dev --companies 00445790,SC090312,OC301540
+```
+
+Pick company numbers you know, and pick variety: a long-established company, a
+Scottish one, an LLP, one that has been struck off. The check asserts the shape
+held — classifications present, chronology dates ordered, verification statuses
+inside the documented set, uncertainty still reported as `null` — and then
+reports what the parsers did *not* recognise:
+
+- filing description codes that fell through to `other`
+- nature-of-control codes it could not decompose
+- fields inside `identity_verification_details` it does not read
+
+That last one is the ECCTA drift detector. It exits non-zero on failure, so it
+also works as the quarterly maintenance job rather than something to remember.
+
+Run it against a deployment with `X402_PAY_TO` unset; it will tell you plainly
+if it hits a paywall instead.
+
+## 8. Watch it
 
 ```bash
 npm run usage -- --url https://<your-worker>.workers.dev --token "$ADMIN_TOKEN"

@@ -5,11 +5,13 @@
   "description": "Metered MCP endpoint over open UK corporate reference data (Companies House), priced in x402.",
   "type": "module",
   "scripts": {
+    "setup": "./scripts/setup.sh",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify": "node scripts/verify-live.mjs",
     "usage": "node scripts/usage-report.mjs"
   },
   "devDependencies": {
