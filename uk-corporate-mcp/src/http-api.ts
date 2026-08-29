@@ -16,7 +16,37 @@ import type { PaymentPayload } from "./x402/types.js";
 export const HTTP_ROUTES: Record<string, string> = {
   "/v1/filing-history": "get_company_filing_history",
   "/v1/psc-verification": "get_psc_verification_status",
+  "/v1/capital-structure": "get_capital_structure",
 };
+
+interface ToolFile {
+  filename: string;
+  content_type: string;
+  base64?: string;
+  text?: string;
+}
+
+/**
+ * A tool that produced a file hands back the file itself over HTTP rather than
+ * a JSON envelope with the bytes inside it: a caller that asked for a
+ * spreadsheet wants a spreadsheet, and base64 in a JSON field is a worse
+ * version of that. The JSON model is still available via format: "json".
+ */
+function fileResponse(file: ToolFile, headers: Record<string, string>): Response | null {
+  const disposition = `attachment; filename="${file.filename.replace(/["\\]/g, "")}"`;
+  const responseHeaders = { ...headers, "content-type": file.content_type, "content-disposition": disposition };
+
+  if (typeof file.text === "string") {
+    return new Response(file.text, { status: 200, headers: responseHeaders });
+  }
+  if (typeof file.base64 === "string") {
+    const binary = atob(file.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return new Response(bytes, { status: 200, headers: responseHeaders });
+  }
+  return null;
+}
 
 function decodeHeaderPayload(raw: string | null): { payload: PaymentPayload | null; error?: string } {
   if (!raw) return { payload: null };
@@ -163,5 +193,12 @@ export async function handleHttpTool(
   }
 
   waitUntil(record(env, event));
+
+  const file = (outcome.value as Record<string, unknown> | undefined)?.["file"] as ToolFile | undefined;
+  if (file) {
+    const response = fileResponse(file, headers);
+    if (response) return response;
+  }
+
   return new Response(JSON.stringify(outcome.value, null, 2), { status: 200, headers });
 }

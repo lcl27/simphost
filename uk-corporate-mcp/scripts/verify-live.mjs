@@ -14,7 +14,7 @@
  * Exits non-zero if anything failed, so it can sit in CI or a quarterly cron.
  */
 
-import { checkFilingHistory, checkPscVerification, summariseFindings } from "./lib/checks.mjs";
+import { checkCapitalStructure, checkFilingHistory, checkPscVerification, summariseFindings } from "./lib/checks.mjs";
 
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) {
@@ -78,6 +78,7 @@ const findings = [];
 const unclassified = new Set();
 const driftFields = new Set();
 const driftCodes = new Set();
+const capitalCodes = new Set();
 
 for (const company of companies) {
   const filings = await callTool("get_company_filing_history", { company_number: company, fetch_all: true });
@@ -90,6 +91,11 @@ for (const company of companies) {
   findings.push(...pscResult.findings);
   pscResult.unknownFields.forEach((f) => driftFields.add(f));
   pscResult.unknownControlCodes.forEach((c) => driftCodes.add(c));
+
+  const capital = await callTool("get_capital_structure", { company_number: company, format: "json" });
+  const capitalResult = checkCapitalStructure(capital, company);
+  findings.push(...capitalResult.findings);
+  capitalResult.unclassifiedCapitalCodes.forEach((c) => capitalCodes.add(c));
 }
 
 const { failures, warnings, notes } = summariseFindings(findings);
@@ -104,9 +110,10 @@ if (failures.length > 0) {
   for (const failure of failures) console.log(`  X  ${failure.message}`);
 }
 
-if (unclassified.size > 0 || driftFields.size > 0 || driftCodes.size > 0) {
+if (unclassified.size > 0 || driftFields.size > 0 || driftCodes.size > 0 || capitalCodes.size > 0) {
   console.log("\nTaxonomy work this run identified:");
   if (unclassified.size > 0) console.log(`  filing codes to classify: ${[...unclassified].sort().join(", ")}`);
+  if (capitalCodes.size > 0) console.log(`  capital codes to classify: ${[...capitalCodes].sort().join(", ")}`);
   if (driftCodes.size > 0) console.log(`  control codes to decompose: ${[...driftCodes].sort().join(", ")}`);
   if (driftFields.size > 0) console.log(`  verification fields to read: ${[...driftFields].sort().join(", ")}`);
 }

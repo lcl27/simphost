@@ -150,3 +150,64 @@ describe("the checks catch the drift they exist to catch", () => {
     expect(summariseFindings(findings).failures[0].message).toContain("unrecognised verification status");
   });
 });
+
+// @ts-expect-error - plain ESM helper shared with the CLI script
+import { checkCapitalStructure } from "../scripts/lib/checks.mjs";
+import { capitalStructureTool } from "../src/tools/capital-structure.js";
+
+describe("live-verification checks for the capital workbook", () => {
+  it("passes a workbook built by the real tool", async () => {
+    installFetchStub();
+    const payload = (await capitalStructureTool.run({ company_number: "00000002" }, ctx())).value;
+    const { findings, unclassifiedCapitalCodes } = checkCapitalStructure(payload, "00000002");
+    expect(summariseFindings(findings).failures).toHaveLength(0);
+    expect(unclassifiedCapitalCodes).toHaveLength(0);
+  });
+
+  it("fails when a sheet has gone missing", () => {
+    const { findings } = checkCapitalStructure(
+      { workbook: { sheets: [{ name: "Summary" }] }, capital_events: [], limits: ["x"] },
+      "X",
+    );
+    expect(summariseFindings(findings).failures.length).toBeGreaterThan(0);
+  });
+
+  it("flags a capital code the event rules did not classify", () => {
+    const { unclassifiedCapitalCodes } = checkCapitalStructure(
+      {
+        workbook: { sheets: EXPECTED.map((name) => ({ name })) },
+        capital_events: [{ event: "other", description_code: "capital-brand-new-thing", capital: [] }],
+        limits: ["x"],
+      },
+      "X",
+    );
+    expect(unclassifiedCapitalCodes).toEqual(["capital-brand-new-thing"]);
+  });
+
+  it("flags a capital figure that did not parse to a number", () => {
+    const { findings } = checkCapitalStructure(
+      {
+        workbook: { sheets: EXPECTED.map((name) => ({ name })) },
+        capital_events: [{ event: "allotment", description_code: "capital-allotment-shares", capital: [{ currency: "GBP", figure: "see attached", value: null }] }],
+        limits: ["x"],
+      },
+      "X",
+    );
+    expect(summariseFindings(findings).warnings[0].message).toContain("did not parse");
+  });
+
+  it("warns when the filing history was truncated, since the capital history is then partial", () => {
+    const { findings } = checkCapitalStructure(
+      {
+        workbook: { sheets: EXPECTED.map((name) => ({ name })) },
+        capital_events: [],
+        basis: { filing_history_complete: false, filings_examined: 500 },
+        limits: ["x"],
+      },
+      "X",
+    );
+    expect(summariseFindings(findings).warnings[0].message).toContain("truncated");
+  });
+});
+
+const EXPECTED = ["Summary", "Issued share capital", "Capital history", "Capital events", "Control (PSC)", "Notes and limits"];

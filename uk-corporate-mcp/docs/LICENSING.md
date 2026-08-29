@@ -43,6 +43,9 @@ for this service:
 
 - Filing codes are matched by rule to one of thirteen groups and a significance
   rating, with labels written here rather than borrowed.
+- Capital filing codes are classified into Companies Act event types
+  (`src/companies-house/capital.ts`) on the same basis, with wording written for
+  this service.
 - Natures of control are **decomposed structurally** — every Companies House PSC
   code is systematically constructed, so `voting-rights-50-to-75-percent-as-trust`
   parses to `{ right: "voting-rights", band: "50-75", held_via: "trust" }`

@@ -8,7 +8,7 @@ machine-readable. This is the checklist.
 
 | Surface | Path | Purpose |
 | --- | --- | --- |
-| x402 resource listing | `/.well-known/x402` (also `/discovery/resources`) | Bazaar-shaped listing of all four resources — two MCP tools, two HTTP endpoints — with live `accepts` blocks. |
+| x402 resource listing | `/.well-known/x402` (also `/discovery/resources`) | Bazaar-shaped listing of every resource — three MCP tools and three HTTP endpoints — with live `accepts` blocks. |
 | Service card | `/` | JSON for agents, a page for people, from the same handler. |
 | MCP endpoint | `/mcp` | Streamable HTTP. `initialize`, `tools/list` and `ping` are free, so a client can read schemas and prices before spending. |
 | Health | `/health` | Configuration state without leaking secrets. |
@@ -30,7 +30,7 @@ Each of these needs an account and a human; none of it can be done from here.
    already in the shape section 8 of the x402 v2 specification describes, with
    `resource`, `type`, `accepts`, `lastUpdated` and `metadata` per item.
 3. **AWS Bedrock AgentCore paid-API discovery.** The premise of the whole
-   exercise. Register both HTTP resources; they carry `accepts` entries for the
+   exercise. Register all three HTTP resources; they carry `accepts` entries for the
    `upto` scheme where the facilitator supports it, which is the scheme AgentCore
    added at GA and the one that fits metered pricing.
 4. **Awesome-MCP style lists and the Cloudflare MCP directory.** Low effort,

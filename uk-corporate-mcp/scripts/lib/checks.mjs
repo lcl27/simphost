@@ -152,3 +152,65 @@ export function summariseFindings(all) {
     notes: all.filter((f) => f.level === "note"),
   };
 }
+
+const EXPECTED_SHEETS = [
+  "Summary",
+  "Issued share capital",
+  "Capital history",
+  "Capital events",
+  "Control (PSC)",
+  "Notes and limits",
+];
+
+export function checkCapitalStructure(payload, companyNumber) {
+  const findings = [];
+  const fail = (message) => findings.push({ level: "fail", message });
+  const warn = (message) => findings.push({ level: "warn", message });
+  const note = (message) => findings.push({ level: "note", message });
+
+  if (payload?.error) {
+    return { findings: [{ level: "fail", message: `${companyNumber}: ${payload.error} — ${payload.message ?? ""}` }], unclassifiedCapitalCodes: [] };
+  }
+
+  const sheets = payload?.workbook?.sheets ?? [];
+  const names = sheets.map((s) => s.name);
+  for (const expected of EXPECTED_SHEETS) {
+    if (!names.includes(expected)) fail(`${companyNumber}: the workbook is missing its "${expected}" sheet.`);
+  }
+
+  const events = payload?.capital_events ?? [];
+  note(
+    `${companyNumber}: ${events.length} capital event(s) from ${payload?.basis?.filings_examined ?? "?"} filings; ` +
+      `issued capital ${(payload?.issued_share_capital ?? []).map((l) => `${l.currency} ${l.figure}`).join(", ") || "not reported"}.`,
+  );
+
+  if (payload?.basis?.filing_history_complete === false) {
+    warn(`${companyNumber}: filing history was truncated at the paging limit, so the capital history may be incomplete.`);
+  }
+
+  // A capital-* filing landing on the generic fallback means the event rules
+  // have not kept up with Companies House's vocabulary.
+  const unclassified = [
+    ...new Set(
+      events
+        .filter((e) => (e.event === "other" || e.event === "statement-of-capital") && String(e.description_code ?? "").startsWith("capital-"))
+        .map((e) => e.description_code),
+    ),
+  ];
+  if (unclassified.length > 0) {
+    warn(`${companyNumber}: capital filing code(s) not classified to a specific event: ${unclassified.join(", ")}`);
+  }
+
+  for (const event of events) {
+    for (const figure of event.capital ?? []) {
+      if (figure.value === null && figure.figure) {
+        warn(`${companyNumber}: capital figure "${figure.figure}" (${figure.currency}) did not parse to a number.`);
+      }
+      if (figure.currency === "UNKNOWN") warn(`${companyNumber}: a capital figure came back with no currency.`);
+    }
+  }
+
+  if ((payload?.limits ?? []).length === 0) fail(`${companyNumber}: the workbook carries no statement of its limits.`);
+
+  return { findings, unclassifiedCapitalCodes: unclassified };
+}

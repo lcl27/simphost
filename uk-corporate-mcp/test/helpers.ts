@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { Env } from "../src/env.js";
 import type { PaymentPayload } from "../src/x402/types.js";
-import { filingHistoryFixture, pscFixture, pscStatementsFixture } from "./fixtures/companies-house.js";
+import { capitalFilingHistoryFixture, filingHistoryFixture, pscFixture, pscStatementsFixture } from "./fixtures/companies-house.js";
 
 export const PAY_TO = "0x209693Bc6afc0C5328bA36FaF03C514EF312287C";
 export const ASSET = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -94,7 +94,10 @@ export function installFetchStub(behaviour: FacilitatorBehaviour = {}): Recorder
     if (url.startsWith("https://api.company-information.service.gov.uk")) {
       recorder.chCalls.push(url);
       const path = new URL(url).pathname;
-      if (path.endsWith("/filing-history")) return jsonResponse(filingHistoryFixture);
+      // 00000002 is the capital-rich company; 00000001 the general one.
+      if (path.endsWith("/filing-history")) {
+        return jsonResponse(path.includes("/00000002/") ? capitalFilingHistoryFixture : filingHistoryFixture);
+      }
       if (path.endsWith("/persons-with-significant-control")) return jsonResponse(pscFixture);
       if (path.endsWith("/persons-with-significant-control-statements")) return jsonResponse(pscStatementsFixture);
       return jsonResponse({ errors: [{ error: "company-profile-not-found", type: "ch:service" }] }, 404);

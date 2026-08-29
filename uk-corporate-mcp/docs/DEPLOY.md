@@ -129,6 +129,8 @@ npm run verify -- --url https://<your-worker>.workers.dev
 npm run verify -- --url https://<your-worker>.workers.dev --companies 00445790,SC090312,OC301540
 ```
 
+It exercises all three tools, including building the capital workbook.
+
 Pick company numbers you know, and pick variety: a long-established company, a
 Scottish one, an LLP, one that has been struck off. The check asserts the shape
 held — classifications present, chronology dates ordered, verification statuses
@@ -136,6 +138,8 @@ inside the documented set, uncertainty still reported as `null` — and then
 reports what the parsers did *not* recognise:
 
 - filing description codes that fell through to `other`
+- capital filing codes that did not classify to a specific event
+- capital figures that did not parse to a number
 - nature-of-control codes it could not decompose
 - fields inside `identity_verification_details` it does not read
 

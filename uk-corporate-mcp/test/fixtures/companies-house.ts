@@ -182,3 +182,103 @@ export const pscStatementsFixture = {
     },
   ],
 };
+
+/**
+ * A separate company with a capital history rich enough to exercise every
+ * event type: incorporation, allotment, subdivision, redenomination,
+ * consolidation, treasury cancellation, and a confirmation statement that
+ * carries its own statement of capital.
+ */
+export const capitalFilingHistoryFixture = {
+  filing_history_status: "filing-history-available",
+  items_per_page: 100,
+  start_index: 0,
+  total_count: 9,
+  items: [
+    {
+      transaction_id: "c9",
+      type: "CS01",
+      date: "2025-06-20",
+      category: "confirmation-statement",
+      description: "confirmation-statement-with-updates",
+      description_values: { made_up_date: "2025-06-01", capital: [{ currency: "GBP", figure: "4,850,000" }] },
+      links: { self: "/x", document_metadata: "https://doc/c9" },
+    },
+    {
+      transaction_id: "c8",
+      type: "AA",
+      date: "2025-05-01",
+      category: "accounts",
+      description: "accounts-with-accounts-type-full",
+      description_values: { made_up_date: "2024-12-31" },
+      links: { self: "/x" },
+    },
+    {
+      transaction_id: "c7",
+      type: "SH06",
+      date: "2025-04-05",
+      category: "capital",
+      description: "capital-cancellation-treasury-shares-with-date-currency-capital-figure",
+      description_values: {
+        date: "2025-04-01",
+        capital: [{ currency: "GBP", figure: "4,850,000" }],
+        alt_capital: [{ currency: "GBP", figure: "150,000" }],
+      },
+      links: { self: "/x", document_metadata: "https://doc/c7" },
+    },
+    {
+      transaction_id: "c6",
+      type: "SH01",
+      date: "2024-09-20",
+      category: "capital",
+      description: "capital-allotment-shares",
+      description_values: { date: "2024-09-15", capital: [{ currency: "GBP", figure: "5,000,000" }] },
+      links: { self: "/x", document_metadata: "https://doc/c6" },
+    },
+    {
+      transaction_id: "c5",
+      type: "SH02",
+      date: "2023-06-05",
+      category: "capital",
+      description: "capital-alter-shares-consolidation-subdivision-statement-of-capital",
+      description_values: { date: "2023-06-01", capital: [{ currency: "GBP", figure: "4,000,000" }] },
+      links: { self: "/x", document_metadata: "https://doc/c5" },
+    },
+    {
+      transaction_id: "c4",
+      type: "SH14",
+      date: "2022-03-15",
+      category: "capital",
+      description: "capital-redomination-of-shares",
+      description_values: { date: "2022-03-10", capital: [{ currency: "EUR", figure: "1,150,000" }] },
+      links: { self: "/x", document_metadata: "https://doc/c4" },
+    },
+    {
+      transaction_id: "c3",
+      type: "SH19",
+      date: "2021-08-12",
+      category: "capital",
+      description: "capital-statement-directors-reduction-of-capital-following-redomination",
+      description_values: { date: "2021-08-01", capital: [{ currency: "GBP", figure: "900,000" }] },
+      links: { self: "/x", document_metadata: "https://doc/c3" },
+    },
+    {
+      transaction_id: "c2",
+      type: "SH01",
+      date: "2018-05-25",
+      category: "capital",
+      description: "capital-allotment-shares",
+      description_values: { date: "2018-05-20", capital: [{ currency: "GBP", figure: "1,000,000" }] },
+      links: { self: "/x", document_metadata: "https://doc/c2" },
+    },
+    {
+      transaction_id: "c1",
+      type: "NEWINC",
+      date: "2015-01-06",
+      category: "incorporation",
+      description: "incorporation-company",
+      description_values: { date: "2015-01-06", capital: [{ currency: "GBP", figure: "100" }] },
+      links: { self: "/x", document_metadata: "https://doc/c1" },
+    },
+  ],
+};

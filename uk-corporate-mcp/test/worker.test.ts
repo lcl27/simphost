@@ -38,14 +38,16 @@ describe("MCP handshake and discovery are free", () => {
     expect((await response.json() as any).result.protocolVersion).toBe("2025-06-18");
   });
 
-  it("lists both tools with their prices, without asking for payment", async () => {
+  it("lists every tool with its price, without asking for payment", async () => {
     installFetchStub();
     const response = await worker.fetch(mcpRequest({ jsonrpc: "2.0", id: 2, method: "tools/list" }), testEnv(), noopCtx);
     const body = (await response.json()) as any;
     const names = body.result.tools.map((t: any) => t.name);
-    expect(names).toEqual(["get_company_filing_history", "get_psc_verification_status"]);
+    expect(names).toEqual(["get_company_filing_history", "get_psc_verification_status", "get_capital_structure"]);
     expect(body.result.tools[0]._meta["x402/price"]).toMatchObject({ base: "2000", ceiling: "10000", base_usd: "$0.002" });
     expect(body.result.tools[0].annotations.readOnlyHint).toBe(true);
+    // The workbook tool costs more upstream work and is priced for it.
+    expect(body.result.tools[2]._meta["x402/price"]).toMatchObject({ base: "5000", ceiling: "25000", base_usd: "$0.005" });
   });
 
   it("answers ping and swallows notifications", async () => {
@@ -235,6 +237,60 @@ describe("the HTTP mirror", () => {
     const response = await worker.fetch(get("/v1/filing-history"), testEnv(), noopCtx);
     expect(response.status).toBe(405);
   });
+
+  it("hands back a real spreadsheet, not a JSON envelope with bytes in it", async () => {
+    installFetchStub();
+    const response = await worker.fetch(
+      new Request("https://uk-corporate-mcp.test/v1/capital-structure", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "payment-signature": btoa(JSON.stringify(paymentPayload("exact", "5000"))),
+        },
+        body: JSON.stringify({ company_number: "00000002", format: "xlsx" }),
+      }),
+      testEnv(),
+      noopCtx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("spreadsheetml");
+    expect(response.headers.get("content-disposition")).toBe('attachment; filename="00000002-capital-structure.xlsx"');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect(bytes[0]).toBe(0x50);
+    expect(bytes[1]).toBe(0x4b);
+    expect(response.headers.get("payment-response")).toBeTruthy();
+  });
+
+  it("hands back CSV as CSV", async () => {
+    installFetchStub();
+    const response = await worker.fetch(
+      new Request("https://uk-corporate-mcp.test/v1/capital-structure", {
+        method: "POST",
+        headers: { "content-type": "application/json", "payment-signature": btoa(JSON.stringify(paymentPayload("exact", "5000"))) },
+        body: JSON.stringify({ company_number: "00000002", format: "csv" }),
+      }),
+      testEnv(),
+      noopCtx,
+    );
+    expect(response.headers.get("content-type")).toContain("text/csv");
+    expect(await response.text()).toContain("# Capital events");
+  });
+
+  it("returns JSON, not a file, when the caller wants the model", async () => {
+    installFetchStub();
+    const response = await worker.fetch(
+      new Request("https://uk-corporate-mcp.test/v1/capital-structure", {
+        method: "POST",
+        headers: { "content-type": "application/json", "payment-signature": btoa(JSON.stringify(paymentPayload("exact", "5000"))) },
+        body: JSON.stringify({ company_number: "00000002" }),
+      }),
+      testEnv(),
+      noopCtx,
+    );
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(((await response.json()) as any).workbook.sheets).toHaveLength(6);
+  });
 });
 
 describe("service surfaces", () => {
@@ -250,8 +306,8 @@ describe("service surfaces", () => {
     const response = await worker.fetch(get("/.well-known/x402"), testEnv(), noopCtx);
     const body = (await response.json()) as any;
     expect(body.x402Version).toBe(2);
-    expect(body.items).toHaveLength(4);
-    expect(body.items.map((i: any) => i.type).sort()).toEqual(["http", "http", "mcp", "mcp"]);
+    expect(body.items).toHaveLength(6);
+    expect(body.items.map((i: any) => i.type).sort()).toEqual(["http", "http", "http", "mcp", "mcp", "mcp"]);
     expect(body.items[0].accepts[0].payTo).toBeTruthy();
     expect(body.items[0].metadata.input_schema.required).toEqual(["company_number"]);
   });
@@ -260,7 +316,7 @@ describe("service surfaces", () => {
     installFetchStub();
     const asJson = await worker.fetch(get("/"), testEnv(), noopCtx);
     expect(asJson.headers.get("content-type")).toContain("application/json");
-    expect(((await asJson.json()) as any).tools).toHaveLength(2);
+    expect(((await asJson.json()) as any).tools).toHaveLength(3);
 
     const asHtml = await worker.fetch(get("/", { accept: "text/html" }), testEnv(), noopCtx);
     expect(asHtml.headers.get("content-type")).toContain("text/html");
