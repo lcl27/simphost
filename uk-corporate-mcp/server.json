@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.lcl27/uk-corporate-mcp",
+  "description": "Metered UK corporate reference data over the Companies House public data API: filing histories classified and reduced to a chronology, and PSC registers with identity-verification status resolved. Priced per call in x402.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/lcl27/simphost",
+    "source": "github",
+    "subfolder": "uk-corporate-mcp"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://REPLACE-WITH-DEPLOYED-HOST/mcp"
+    }
+  ]
+}

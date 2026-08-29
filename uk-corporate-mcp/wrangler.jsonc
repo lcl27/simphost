@@ -1,0 +1,44 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "uk-corporate-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-23",
+  "observability": { "enabled": true },
+
+  // Public, non-secret configuration. Secrets (CH_API_KEY, ADMIN_TOKEN,
+  // X402_FACILITATOR_TOKEN) are set with `wrangler secret put`, never here.
+  "vars": {
+    // Base Sepolia while the endpoint is being proved out. Switch both of these
+    // together for mainnet: "eip155:8453" and Base USDC
+    // 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913.
+    "X402_NETWORK": "eip155:84532",
+    "X402_ASSET": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "X402_ASSET_NAME": "USDC",
+    "X402_ASSET_VERSION": "2",
+    "X402_ASSET_DECIMALS": "6",
+    "X402_SCHEMES": "exact,upto",
+    "X402_FACILITATOR_URL": "https://x402.org/facilitator",
+
+    // Until X402_PAY_TO is set to a real address the tools are served free, so a
+    // half-configured deployment never emits a 402 nobody can satisfy.
+    "X402_PAY_TO": "",
+    "X402_ENABLED": "true",
+
+    // Set once the worker has its final hostname, so that the resource URLs in
+    // payment challenges and the discovery document are stable.
+    "PUBLIC_BASE_URL": ""
+  },
+
+  // Create with: wrangler kv namespace create METER
+  // then paste the returned id here.
+  "kv_namespaces": [
+    {
+      "binding": "METER",
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+    }
+  ]
+
+  // Optional, on a Workers Paid plan: an Analytics Engine dataset gives queryable
+  // usage history alongside the KV ledger.
+  // "analytics_engine_datasets": [{ "binding": "ANALYTICS", "dataset": "uk_corporate_mcp_calls" }]
+}

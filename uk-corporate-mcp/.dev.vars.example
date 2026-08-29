@@ -1,0 +1,13 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit .dev.vars.
+
+# Free key from https://developer.company-information.service.gov.uk/
+CH_API_KEY=
+
+# Guards GET /admin/usage.
+ADMIN_TOKEN=
+
+# Only needed for facilitators that authenticate (the Coinbase CDP one does).
+X402_FACILITATOR_TOKEN=
+
+# Set to your receiving wallet to turn payments on locally.
+X402_PAY_TO=
